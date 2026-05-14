@@ -8,11 +8,15 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ============================================
+# FIX: Auto-load API key from Streamlit Secrets
+# ============================================
+if "GROQ_API_KEY" in st.secrets:
+    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # Page configuration
 st.set_page_config(
@@ -31,8 +35,6 @@ if "vector_store" not in st.session_state:
     st.session_state.vector_store = None
 if "current_docs" not in st.session_state:
     st.session_state.current_docs = []
-if "conversation_history" not in st.session_state:
-    st.session_state.conversation_history = []
 if "chunk_size" not in st.session_state:
     st.session_state.chunk_size = 500
 
@@ -40,8 +42,13 @@ if "chunk_size" not in st.session_state:
 with st.sidebar:
     st.header("⚙️ Configuration")
     
-    # API Key
-    groq_api_key = st.text_input("Groq API Key", type="password")
+    # ============================================
+    # FIX: Auto-populate API key from secrets
+    # ============================================
+    default_key = os.getenv("GROQ_API_KEY", "")
+    groq_api_key = st.text_input("Groq API Key", type="password", 
+                                  value=default_key,
+                                  help="Get free key at console.groq.com")
     
     st.divider()
     
@@ -59,8 +66,7 @@ with st.sidebar:
     uploaded_files = st.file_uploader(
         "Choose files",
         type=['pdf', 'txt', 'docx'],
-        accept_multiple_files=True,
-        help="Upload any technical documentation"
+        accept_multiple_files=True
     )
     
     # Text paste option
@@ -77,7 +83,6 @@ with st.sidebar:
                     tmp_file.write(uploaded_file.getvalue())
                     tmp_path = tmp_file.name
                 
-                # Load based on file type
                 if uploaded_file.name.endswith('.pdf'):
                     loader = PyPDFLoader(tmp_path)
                 elif uploaded_file.name.endswith('.docx'):
@@ -93,14 +98,12 @@ with st.sidebar:
                 all_documents.extend(documents)
                 os.unlink(tmp_path)
             
-            # Split into chunks
             text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=st.session_state.chunk_size,
                 chunk_overlap=50
             )
             chunks = text_splitter.split_documents(all_documents)
             
-            # Create embeddings and vector store
             embeddings = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
@@ -108,7 +111,6 @@ with st.sidebar:
             st.session_state.vector_store = FAISS.from_documents(chunks, embeddings)
             st.session_state.current_docs = [f.name for f in uploaded_files]
             st.session_state.messages = []
-            st.session_state.conversation_history = []
             
             st.success(f"✅ Processed {len(uploaded_files)} files | {len(chunks)} chunks created")
             st.rerun()
@@ -131,12 +133,10 @@ with st.sidebar:
             st.session_state.vector_store = FAISS.from_documents(chunks, embeddings)
             st.session_state.current_docs = ["Pasted Text"]
             st.session_state.messages = []
-            st.session_state.conversation_history = []
             
             st.success(f"✅ Processed pasted text | {len(chunks)} chunks created")
             st.rerun()
     
-    # Show currently loaded documents
     if st.session_state.current_docs:
         st.divider()
         st.subheader("📄 Active Documents")
@@ -147,7 +147,6 @@ with st.sidebar:
             st.session_state.vector_store = None
             st.session_state.current_docs = []
             st.session_state.messages = []
-            st.session_state.conversation_history = []
             st.rerun()
     
     st.divider()
@@ -165,12 +164,10 @@ with st.sidebar:
     
     if st.button("🗑️ Clear Chat History"):
         st.session_state.messages = []
-        st.session_state.conversation_history = []
         st.rerun()
     
     st.divider()
     st.caption("Built with LangChain + FAISS + Groq Llama 3")
-    st.caption("Features: Multi-format Docs | Export Chat | Adjustable Chunk Size")
 
 # Display chat history
 for message in st.session_state.messages:
@@ -185,7 +182,6 @@ def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
 def get_rag_chain(api_key, vector_store):
-    """Create RAG chain"""
     if not api_key or not vector_store:
         return None, None
     
@@ -211,7 +207,6 @@ Answer concisely and accurately:"""
         input_variables=["context", "question"]
     )
     
-    # Create chain
     def chain(question):
         docs = retriever.invoke(question)
         context = format_docs(docs)
@@ -223,7 +218,6 @@ Answer concisely and accurately:"""
 
 # Chat input
 if prompt := st.chat_input("Ask about your uploaded documents..."):
-    # Check if documents are loaded
     if st.session_state.vector_store is None:
         st.warning("⚠️ Please upload documents first using the sidebar!")
         st.stop()
@@ -232,12 +226,10 @@ if prompt := st.chat_input("Ask about your uploaded documents..."):
         st.warning("⚠️ Please enter your Groq API key in the sidebar!")
         st.stop()
     
-    # Add user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
     
-    # Get response
     with st.chat_message("assistant"):
         with st.spinner("Searching your documents..."):
             chain, _ = get_rag_chain(groq_api_key, st.session_state.vector_store)
@@ -255,7 +247,6 @@ if prompt := st.chat_input("Ask about your uploaded documents..."):
                         for src in sources:
                             st.caption(f"- {src}")
     
-    # Save to history
     st.session_state.messages.append({
         "role": "assistant", 
         "content": response,
