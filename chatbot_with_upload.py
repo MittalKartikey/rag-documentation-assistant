@@ -275,14 +275,29 @@ if st.session_state.last_question:
 
         with st.spinner("Evaluating response..."):
 
-            score = evaluate_rag(
+            scores = evaluate_rag(
                 question=st.session_state.last_question,
                 answer=st.session_state.last_answer,
                 retrieved_docs=st.session_state.last_docs,
                 api_key=groq_api_key
             )
 
-            st.metric(
-                "Faithfulness Score",
-                round(float(score), 3)
-            )
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric(
+                    "Faithfulness",
+                    round(scores["faithfulness"], 3)
+                )
+
+            with col2:
+                st.metric(
+                    "Answer Relevancy",
+                    round(scores["answer_relevancy"], 3)
+                )
+
+            with col3:
+                st.metric(
+                    "Context Precision",
+                    round(scores["context_precision"], 3)
+                )
