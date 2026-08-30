@@ -1,16 +1,32 @@
+import asyncio
+
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from ragas import SingleTurnSample
-
 from ragas.metrics import (
     Faithfulness,
     ResponseRelevancy,
     LLMContextPrecisionWithoutReference
 )
-
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
+
+
+async def evaluate_all_metrics(
+    faithfulness_metric,
+    relevancy_metric,
+    context_precision_metric,
+    sample
+):
+
+    results = await asyncio.gather(
+        faithfulness_metric.single_turn_ascore(sample),
+        relevancy_metric.single_turn_ascore(sample),
+        context_precision_metric.single_turn_ascore(sample)
+    )
+
+    return results
 
 
 def evaluate_rag(question, answer, retrieved_docs, api_key):
@@ -26,7 +42,7 @@ def evaluate_rag(question, answer, retrieved_docs, api_key):
         evaluator_model
     )
 
-    # Same embedding model used by the RAG system
+    # Embeddings for Answer Relevancy
     embedding_model = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
@@ -35,7 +51,7 @@ def evaluate_rag(question, answer, retrieved_docs, api_key):
         embedding_model
     )
 
-    # Build evaluation sample
+    # Evaluation sample
     sample = SingleTurnSample(
         user_input=question,
         response=answer,
@@ -45,36 +61,32 @@ def evaluate_rag(question, answer, retrieved_docs, api_key):
         ]
     )
 
-    # 1. Faithfulness
+    # Metrics
     faithfulness_metric = Faithfulness(
         llm=evaluator_llm
     )
 
-    faithfulness_score = faithfulness_metric.single_turn_score(
-        sample
-    )
-
-    # 2. Answer Relevancy
     relevancy_metric = ResponseRelevancy(
         llm=evaluator_llm,
         embeddings=evaluator_embeddings
     )
 
-    relevancy_score = relevancy_metric.single_turn_score(
-        sample
-    )
-
-    # 3. Context Precision
     context_precision_metric = LLMContextPrecisionWithoutReference(
         llm=evaluator_llm
     )
 
-    context_precision_score = (
-        context_precision_metric.single_turn_score(sample)
+    # Run all metrics concurrently
+    results = asyncio.run(
+        evaluate_all_metrics(
+            faithfulness_metric,
+            relevancy_metric,
+            context_precision_metric,
+            sample
+        )
     )
 
     return {
-        "faithfulness": float(faithfulness_score),
-        "answer_relevancy": float(relevancy_score),
-        "context_precision": float(context_precision_score)
+        "faithfulness": float(results[0]),
+        "answer_relevancy": float(results[1]),
+        "context_precision": float(results[2])
     }
