@@ -13,7 +13,7 @@ def evaluate_rag(question, answer, retrieved_docs, api_key):
 
     # Groq model used as evaluator
     evaluator_model = ChatGroq(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         temperature=0,
         groq_api_key=api_key
     )
