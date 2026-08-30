@@ -9,6 +9,7 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader, Unstru
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
+from evaluation import evaluate_rag
 
 load_dotenv()
 
