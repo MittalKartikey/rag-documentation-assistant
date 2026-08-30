@@ -38,6 +38,12 @@ if "current_docs" not in st.session_state:
     st.session_state.current_docs = []
 if "chunk_size" not in st.session_state:
     st.session_state.chunk_size = 500
+if "last_question" not in st.session_state:
+    st.session_state.last_question = None
+if "last_answer" not in st.session_state:
+    st.session_state.last_answer = None
+if "last_docs" not in st.session_state:
+    st.session_state.last_docs = None
 
 # Sidebar
 with st.sidebar:
