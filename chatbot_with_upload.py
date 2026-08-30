@@ -195,7 +195,7 @@ def get_rag_chain(api_key, vector_store):
     retriever = vector_store.as_retriever(search_kwargs={"k": 4})
     
     llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         temperature=0.3,
         groq_api_key=api_key
     )
