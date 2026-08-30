@@ -239,6 +239,11 @@ if prompt := st.chat_input("Ask about your uploaded documents..."):
                 response = "Please ensure API key is set and documents are uploaded."
             else:
                 response, docs = chain(prompt)
+
+                st.session_state.last_question = prompt
+                st.session_state.last_answer = response
+                st.session_state.last_docs = docs
+                
                 sources = list(set([doc.metadata.get("source", "Unknown") for doc in docs]))
                 
                 st.markdown(response)
