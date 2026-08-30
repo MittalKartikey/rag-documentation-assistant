@@ -264,3 +264,25 @@ if prompt := st.chat_input("Ask about your uploaded documents..."):
         "content": response,
         "sources": sources if 'sources' in locals() else None
     })
+
+
+if st.session_state.last_question:
+
+    st.divider()
+    st.subheader("📊 Model Evaluation")
+
+    if st.button("Evaluate Last Response"):
+
+        with st.spinner("Evaluating response..."):
+
+            score = evaluate_rag(
+                question=st.session_state.last_question,
+                answer=st.session_state.last_answer,
+                retrieved_docs=st.session_state.last_docs,
+                api_key=groq_api_key
+            )
+
+            st.metric(
+                "Faithfulness Score",
+                round(float(score), 3)
+            )
